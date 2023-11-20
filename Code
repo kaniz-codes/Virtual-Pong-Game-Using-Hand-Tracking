@@ -1,0 +1,98 @@
+import cv2
+import  cvzone
+from cvzone.HandTrackingModule import HandDetector
+import numpy as np
+
+cap = cv2.VideoCapture(0)
+cap.set(3, 1280)
+cap.set(4, 720)
+
+# Importing all images
+imgBackground = cv2.imread("Resources/Background.png")
+imgOver = cv2.imread("Resources/Over.png")
+imgBall = cv2.imread("Resources/Ball.png", cv2.IMREAD_UNCHANGED)
+imgStick = cv2.imread("Resources/Stick.png", cv2.IMREAD_UNCHANGED)
+imgStick1 = cv2.imread("Resources/Stick1.png", cv2.IMREAD_UNCHANGED)
+imgGameOver = cv2.imread("Resources/GameOver.png", cv2.IMREAD_UNCHANGED)
+
+# Hand Detector
+detector = HandDetector(staticMode=False, maxHands=2, modelComplexity=1, detectionCon=0.5, minTrackCon=0.5)
+
+# Variables
+ballPos = [100, 100]
+speedX= 20
+speedY= 20
+gameOver = False
+score = [0, 0]
+
+while True:
+    _, img = cap.read()
+    img = cv2.flip(img, 1)
+    imgRaw= img.copy()
+
+    # Find the hand and it's landmarks
+    hands, img = detector.findHands(img, flipType=False) # with draw
+
+    #Overlaying the background image
+    img = cv2.addWeighted(img, 0.1, imgBackground, 0.8, 0)
+
+    # Check for Hands
+    if hands:
+        for hand in hands:
+            x, y, w, h = hand['bbox']
+            h1, w1, _ = imgStick.shape
+            y1 = y - h1//2
+            y1 = np.clip(y1, 20, 415)
+
+            if hand['type'] == "Left":
+                img = cvzone.overlayPNG(img, imgStick, (50, y1))
+                if 59 < ballPos[0]<50+w1 and y1 < ballPos[1] < y1+h1:
+                    speedX = -speedX
+                    ballPos[0] += 30
+                    score[0] += 1
+
+
+            if hand['type'] == "Right":
+                img = cvzone.overlayPNG(img, imgStick1, (1190, y1))
+                if 1190-50 < ballPos[0] < 1190-30 + w1 and y1 < ballPos[1] < y1 + h1:
+                    speedX = -speedX
+                    ballPos[0] -= 30
+                    score[1] += 1
+
+    # Game Over
+    if ballPos[0]<40 or ballPos[0] >1200:
+        gameOver = True
+
+    if gameOver:
+        # img = cvzone.overlayPNG(img, imgGameOver , ballPos)
+        img = imgOver
+        cv2.putText(img, str(score[1] + score[0]).zfill(2), (600, 650), cv2.FONT_HERSHEY_COMPLEX, 3, (255, 255, 255), 9)
+
+    # If game not over move the ball
+    else:
+        # Move the ball
+        if ballPos[1] >= 500 or ballPos[1] <= 10:
+            speedY = -speedY
+
+        ballPos[0] += speedX
+        ballPos[1] += speedY
+
+        # draw the ball
+        img = cvzone.overlayPNG(img, imgBall, ballPos)
+
+        cv2.putText(img, str(score[0]), (300, 650), cv2.FONT_HERSHEY_COMPLEX, 3, (255,255,255), 9)
+        cv2.putText(img, str(score[1]), (900, 650), cv2.FONT_HERSHEY_COMPLEX, 3, (255, 255, 255), 9)
+
+    img[580:700, 20:233] = cv2.resize(imgRaw, (213, 120))
+
+
+    cv2.imshow("Kaniz", img)
+    key = cv2.waitKey(1)
+
+    if key == ord('r'):
+        ballPos = [100, 100]
+        speedX = 20
+        speedY = 20
+        gameOver = False
+        score = [0, 0]
+        imgOver = cv2.imread("Resources/Over.png")
